@@ -135,7 +135,7 @@ def real_user_home() -> Path:
         try:
             buffer: Array[ctypes.c_wchar] = ctypes.create_unicode_buffer(init=260)
             csidl_profile: int = 40
-            code = ctypes.windll.shell32.SHGetFolderPathW(
+            code: int = ctypes.windll.shell32.SHGetFolderPathW(
                 None, csidl_profile, None, 0, buffer
             )
             if code == 0 and buffer.value:
@@ -399,9 +399,9 @@ def measure_tree(path: Path) -> tuple[int, int, float]:
     newest: float = 0.0
     stack: list[Path] = [path]
     while stack:
-        current = stack.pop()
+        current: Path = stack.pop()
         try:
-            entries = os.scandir(path=current)
+            entries: os._ScandirIterator[str] = os.scandir(path=current)
         except OSError:
             continue
         with entries:
@@ -409,7 +409,7 @@ def measure_tree(path: Path) -> tuple[int, int, float]:
                 if count >= MAX_FILES_PER_CANDIDATE:
                     return total, count, newest
                 try:
-                    info = entry.stat(follow_symlinks=False)
+                    info: os.stat_result = entry.stat(follow_symlinks=False)
                 except OSError:
                     continue
                 if entry.is_dir(follow_symlinks=False) and not is_reparse_point(
@@ -434,7 +434,7 @@ def fingerprint(path: Path) -> Fingerprint:
         Mapping with ``dev``, ``ino`` and ``mtime`` when available.
     """
     try:
-        info = path.lstat()
+        info: os.stat_result = path.lstat()
     except OSError:
         return {}
     return {
@@ -467,7 +467,7 @@ def protected_paths() -> list[Path]:
             "ProgramFiles(x86)",
             "ProgramData",
         ):
-            setting = os.environ.get(variable)
+            setting: str | None = os.environ.get(variable)
             if setting:
                 candidates.append(Path(setting))
     unique: list[Path] = []
@@ -500,7 +500,7 @@ def unsafe_reason(path: Path) -> str | None:
         return "es un enlace o junction; no se sigue"
 
     key: str = norm(path=path)
-    parts = [
+    parts: list[str] = [
         part
         for part in Path(key).parts
         if part not in (os.sep, os.altsep, "")
@@ -552,10 +552,10 @@ def cache_locations() -> list[CacheLocation]:
         Candidate cache directories, whether or not they currently exist.
     """
     home: Path = real_user_home()
-    local = os.environ.get("LOCALAPPDATA")
-    roaming = os.environ.get("APPDATA")
-    local_root = Path(local) if local else home / "AppData" / "Local"
-    roaming_root = Path(roaming) if roaming else home / "AppData" / "Roaming"
+    local: str | None = os.environ.get("LOCALAPPDATA")
+    roaming: str | None = os.environ.get("APPDATA")
+    local_root: Path = Path(local) if local else home / "AppData" / "Local"
+    roaming_root: Path = Path(roaming) if roaming else home / "AppData" / "Roaming"
 
     found: list[CacheLocation] = []
     if os.name == "nt":
@@ -806,7 +806,7 @@ CACHE_CONTAINER_SEGMENTS: dict[str, tuple[str, str, Policy]] = {
 }
 
 #: Directory names that make up a uv cache, in either layout.
-UV_CACHE_PREFIXES = (
+UV_CACHE_PREFIXES: tuple[str, ...] = (
     "archive-v",
     "builds-v",
     "wheels-v",
@@ -816,7 +816,7 @@ UV_CACHE_PREFIXES = (
 )
 
 #: Parent directory names that mark a cache container.
-CACHE_PARENT_NAMES = frozenset({".cache", "cache", "caches"})
+CACHE_PARENT_NAMES: frozenset[str] = frozenset({".cache", "cache", "caches"})
 
 
 def read_pyvenv_cfg(path: Path) -> dict[str, str] | None:
@@ -829,7 +829,7 @@ def read_pyvenv_cfg(path: Path) -> dict[str, str] | None:
         Parsed key/value pairs, or None when the file cannot be read.
     """
     try:
-        text = (path / "pyvenv.cfg").read_text(encoding="utf-8", errors="replace")
+        text: str = (path / "pyvenv.cfg").read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
     data: dict[str, str] = {}
@@ -853,7 +853,7 @@ def venv_has_interpreter(path: Path) -> bool:
         True when ``Scripts``/``bin`` holds a Python executable entry.
     """
     for dirname in ("Scripts", "bin"):
-        directory = path / dirname
+        directory: Path = path / dirname
         if not dir_exists(path=directory):
             continue
         for executable in ("python.exe", "python"):
@@ -872,7 +872,7 @@ def venv_interpreter_alive(path: Path) -> bool:
         True when the interpreter entry points at a real file.
     """
     for dirname in ("Scripts", "bin"):
-        directory = path / dirname
+        directory: Path = path / dirname
         if not dir_exists(path=directory):
             continue
         for executable in ("python.exe", "python"):
@@ -931,7 +931,7 @@ def is_app_data_surface(path: Path) -> bool:
         True when any ancestor below the profile is an application directory.
     """
     home_key: str = norm(path=real_user_home())
-    prefix = home_key.rstrip(os.sep) + os.sep
+    prefix: str = home_key.rstrip(os.sep) + os.sep
     for parent in path.parents:
         key: str = norm(path=parent)
         if key == home_key:
@@ -1219,12 +1219,14 @@ def run_scan(options: ScanOptions) -> tuple[list[Candidate], dict[str, Any]]:
         Tuple of the candidate list (large to small, caches first) and a
         summary mapping with counts and reclaimed bytes.
     """
-    now = time.time()
+    now: float = time.time()
     every_location: list[CacheLocation] = cache_locations()
 
     if options.explicit_roots:
-        roots = [Path(root_text).expanduser() for root_text in options.roots]
-        locations = [
+        roots: list[Path] = [
+            Path(root_text).expanduser() for root_text in options.roots
+        ]
+        locations: list[CacheLocation] = [
             location
             for location in every_location
             if any(is_within(child=location.path, parent=root) for root in roots)
@@ -1233,7 +1235,7 @@ def run_scan(options: ScanOptions) -> tuple[list[Candidate], dict[str, Any]]:
         locations = every_location
 
     # Blocked regardless: the tree walk must not re-report a cache the table owns.
-    known_cache_roots = [
+    known_cache_roots: list[Path] = [
         location.path for location in every_location if dir_exists(path=location.path)
     ]
 
@@ -1275,7 +1277,7 @@ def run_scan(options: ScanOptions) -> tuple[list[Candidate], dict[str, Any]]:
 
     # 2. Project artifacts found by walking the roots.
     for root_text in options.roots:
-        root = Path(root_text).expanduser()
+        root: Path = Path(root_text).expanduser()
         if not dir_exists(path=root):
             continue
         try:
@@ -1290,7 +1292,9 @@ def run_scan(options: ScanOptions) -> tuple[list[Candidate], dict[str, Any]]:
         except OSError:
             continue
 
-    order = {policy: index for index, policy in enumerate(iterable=POLICY_ORDER)}
+    order: dict[Policy, int] = {
+        policy: index for index, policy in enumerate(iterable=POLICY_ORDER)
+    }
     candidates.sort(
         key=lambda item: (order.get(item.policy, 9), -item.size_bytes, item.path)
     )
@@ -1346,7 +1350,7 @@ def load_plan(path: Path) -> dict[str, Any]:
         SystemExit: When the file is missing, not JSON, or not a plan.
     """
     try:
-        data = json.loads(s=path.read_text(encoding="utf-8"))
+        data: Any = json.loads(s=path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         raise SystemExit(f"No existe el plan: {path}")
     except json.JSONDecodeError as exc:
@@ -1554,7 +1558,7 @@ def run_select(plan: dict[str, Any], plan_path: Path) -> int:
         chosen, size = selection_summary(plan=plan)
         print(f"seleccionadas: {chosen}/{len(entries)}  ({human_bytes(size=size)})")
         try:
-            raw = input("prune> ").strip()
+            raw: str = input("prune> ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nSaliste sin guardar. La selección no se modificó.")
             return 130
@@ -1620,7 +1624,7 @@ def run_select(plan: dict[str, Any], plan_path: Path) -> int:
             if not tokens:
                 print("Uso: f TEXTO")
                 continue
-            needle = " ".join(tokens).lower()
+            needle: str = " ".join(tokens).lower()
             hits: int = 0
             for entry in entries:
                 if needle in str(object=entry.get("path", "")).lower():
@@ -1741,7 +1745,7 @@ def windows_recycle(path: Path) -> None:
             "ruta de 260 caracteres o más: la Papelera no la acepta (usá --hard)"
         )
 
-    operation = SHFILEOPSTRUCTW()
+    operation: SHFILEOPSTRUCTW = SHFILEOPSTRUCTW()
     operation.hwnd = None
     operation.wFunc = FO_DELETE
     operation.pFrom = text + "\0"
@@ -1767,7 +1771,7 @@ def xdg_trash(path: Path) -> None:
         path: Path to remove.
     """
     data_home: str | None = os.environ.get(key="XDG_DATA_HOME")
-    base = Path(data_home) if data_home else real_user_home() / ".local" / "share"
+    base: Path = Path(data_home) if data_home else real_user_home() / ".local" / "share"
     files_dir: Path = base / "Trash" / "files"
     info_dir: Path = base / "Trash" / "info"
     files_dir.mkdir(parents=True, exist_ok=True)
@@ -1897,9 +1901,9 @@ def revalidate(entry: PlanEntry) -> str | None:
         return reason
 
     current: Fingerprint = fingerprint(path=path)
-    planned = entry.get("fingerprint") or {}
-    planned_dev = planned.get("dev") or 0
-    planned_ino = planned.get("ino") or 0
+    planned: Fingerprint = entry.get("fingerprint") or {}
+    planned_dev: int = planned.get("dev") or 0
+    planned_ino: int = planned.get("ino") or 0
     if planned_dev and current.get("dev") and planned_dev != current.get("dev"):
         return "cambió el volumen desde el escaneo"
     if planned_ino and current.get("ino") and planned_ino != current.get("ino"):
@@ -1935,7 +1939,7 @@ def run_apply(plan: dict[str, Any], *, hard: bool, assume_yes: bool) -> int:
         return 1
 
     chosen: list[dict[str, Any]] = drop_nested(entries=chosen)
-    total = sum(int(entry.get("size_bytes", 0)) for entry in chosen)
+    total: int = sum(int(entry.get("size_bytes", 0)) for entry in chosen)
     destination: Literal["borrado definitivo", "Papelera de reciclaje"] = (
         "borrado definitivo"
         if hard
@@ -1946,7 +1950,7 @@ def run_apply(plan: dict[str, Any], *, hard: bool, assume_yes: bool) -> int:
     )
     if not assume_yes:
         try:
-            answer = input("¿Confirmás el borrado? [s/N] ").strip().lower()
+            answer: str = input("¿Confirmás el borrado? [s/N] ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             print("\nCancelado.")
             return 130
@@ -2020,7 +2024,7 @@ def build_parser() -> argparse.ArgumentParser:
         Configured parser with the ``scan``, ``select``, ``apply`` and ``show``
         subcommands.
     """
-    parser = argparse.ArgumentParser(
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(
         prog="prune",
         description="Encuentra entornos virtuales viejos, cachés y artefactos de build. "
         "Escanea, te deja elegir, y solo después borra lo elegido.",
@@ -2113,8 +2117,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args: argparse.Namespace = parser.parse_args(args=argv)
 
     if args.command == "scan":
-        roots = args.root or default_roots()
-        options = ScanOptions(
+        roots: list[str] = args.root or default_roots()
+        options: ScanOptions = ScanOptions(
             roots=roots,
             max_depth=args.max_depth,
             min_age_days=args.min_age_days,
