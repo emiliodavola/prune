@@ -1,0 +1,53 @@
+# --- Generated output of prune.py -------------------------------------
+# prune writes its scan plan here (DEFAULT_PLAN_NAME in prune.py).
+prune-plan.json
+# Legacy name from before the rename; safe to delete the file.
+devclean-plan.json
+
+# --- Python ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# --- Test / type-check / lint caches --------------------------------------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# --- Virtual environments and build artifacts -----------------------------
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+build/
+dist/
+.tox/
+.nox/
+
+# --- Local configuration and secrets --------------------------------------
+.env
+.env.*
+!.env.example
+
+# --- Windows PowerShell artifact ------------------------------------------
+# When powershell.exe is spawned with a scrubbed environment (no
+# LOCALAPPDATA), it resolves its module analysis cache relative to the
+# current directory and creates ./Microsoft/Windows/PowerShell/.
+/Microsoft/
+
+# --- Agent/tooling state (not part of the project) ------------------------
+.atl/
+
+# --- OS and editor noise --------------------------------------------------
+Thumbs.db
+Desktop.ini
+.DS_Store
+.idea/
+.vscode/
